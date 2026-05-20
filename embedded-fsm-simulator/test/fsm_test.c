@@ -1,34 +1,39 @@
 #include <stdio.h>
+
 #include "fsm.h"
+#include "event_queue.h"
 
 int main(void)
 {
     system_state_t state = STATE_INIT;
 
-    system_event_t test_events[] = {
-        EVT_INIT_DONE,
-        EVT_CHECKS_OK,
-        EVT_START,
-        EVT_FAULT,
-        EVT_RECOVER,
-        EVT_RECOVERY_DONE,
-        EVT_CHECKS_OK,
-        EVT_START,
-        EVT_STOP
-    };
+    event_queue_t queue;
 
-    int count = sizeof(test_events) / sizeof(test_events[0]);
+    queue_init(&queue);
 
-    printf("Starting FSM Test\n\n");
+    queue_push(&queue, EVT_INIT_DONE);
+    queue_push(&queue, EVT_CHECKS_OK);
+    queue_push(&queue, EVT_START);
+    queue_push(&queue, EVT_FAULT);
+    queue_push(&queue, EVT_RECOVER);
+    queue_push(&queue, EVT_RECOVERY_DONE);
 
-    for (int i = 0; i < count; i++) {
-        printf("Event %d | %s -> ",
-               test_events[i],
+    system_event_t event;
+
+    printf("Starting Queue-Driven FSM Test\n\n");
+
+    while (!queue_is_empty(&queue))
+    {
+        queue_pop(&queue, &event);
+
+        printf("Event: %d | State: %s -> ",
+               event,
                state_to_str(state));
 
-        state = fsm_handle_event(state, test_events[i]);
+        state = fsm_handle_event(state, event);
 
-        printf("%s\n", state_to_str(state));
+        printf("%s\n",
+               state_to_str(state));
     }
 
     return 0;
