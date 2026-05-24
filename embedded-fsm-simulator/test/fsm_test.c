@@ -2,6 +2,7 @@
 
 #include "fsm.h"
 #include "event_queue.h"
+#include "software_timer.h"
 
 int main(void)
 {
@@ -9,31 +10,62 @@ int main(void)
 
     event_queue_t queue;
 
+    software_timer_t timer;
+
     queue_init(&queue);
 
+    timer_init(&timer, 3);
+
     queue_push(&queue, EVT_INIT_DONE);
-    queue_push(&queue, EVT_CHECKS_OK);
-    queue_push(&queue, EVT_START);
-    queue_push(&queue, EVT_FAULT);
-    queue_push(&queue, EVT_RECOVER);
-    queue_push(&queue, EVT_RECOVERY_DONE);
 
-    system_event_t event;
+    int ticks = 0;
 
-    printf("Starting Queue-Driven FSM Test\n\n");
+    printf("Starting Timer-Driven FSM Test\n\n");
 
-    while (!queue_is_empty(&queue))
+    while (ticks < 15)
     {
-        queue_pop(&queue, &event);
+        if (timer_tick(&timer))
+        {
+            queue_push(&queue, EVT_CHECKS_OK);
+        }
 
-        printf("Event: %d | State: %s -> ",
-               event,
-               state_to_str(state));
+        system_event_t event;
 
-        state = fsm_handle_event(state, event);
+        while (!queue_is_empty(&queue))
+        {
+            queue_pop(&queue, &event);
 
-        printf("%s\n",
-               state_to_str(state));
+            printf("Event: %d | %s -> ",
+                   event,
+                   state_to_str(state));
+
+            state = fsm_handle_event(state, event);
+
+            printf("%s\n",
+                   state_to_str(state));
+
+            if (state == STATE_READY)
+            {
+                queue_push(&queue, EVT_START);
+            }
+
+            if (state == STATE_RUNNING && ticks > 8)
+            {
+                queue_push(&queue, EVT_FAULT);
+            }
+
+            if (state == STATE_FAULT)
+            {
+                queue_push(&queue, EVT_RECOVER);
+            }
+
+            if (state == STATE_RECOVERY)
+            {
+                queue_push(&queue, EVT_RECOVERY_DONE);
+            }
+        }
+
+        ticks++;
     }
 
     return 0;
